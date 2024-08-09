@@ -1,0 +1,7 @@
+
+[keybinds]
+X = "Button_X_Mapping"
+
+[CustomOptionsKeybinds]
+functionName = "Button_Y_Mapping"
+customOptions = [1, 2, 3]
