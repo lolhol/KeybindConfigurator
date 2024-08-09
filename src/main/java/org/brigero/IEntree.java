@@ -1,6 +1,6 @@
 package org.brigero;
 
-public interface IEntree<T> {
-    T getAdditionalOptions();
+public interface IEntree {
+    Object[] getAdditionalOptions();
     String getFunctionName();
 }

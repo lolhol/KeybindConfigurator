@@ -1,7 +1,4 @@
-
-[keybinds]
-X = "Button_X_Mapping"
-
-[CustomOptionsKeybinds]
-functionName = "Button_Y_Mapping"
-customOptions = [1, 2, 3]
+[X]
+functionName = "CustomXTest"
+numbers = [1, 2, 3]
+doubles = [1.0, 2.0, 3.0]
