@@ -1,22 +1,11 @@
 package org.brigero;
 
 public class Config {
-    public KeybindsCustom X;
+    public CusomClass Sample;
 
-    public static class KeybindsCustom implements IEntree {
-        public String functionName;
-
+    public static class CusomClass {
+        public String name;
         public int[] numbers;
         public double[] doubles;
-
-        @Override
-        public Object[] getAdditionalOptions() {
-            return new Object[] {numbers, doubles};
-        }
-
-        @Override
-        public String getFunctionName() {
-            return functionName;
-        }
     }
 }

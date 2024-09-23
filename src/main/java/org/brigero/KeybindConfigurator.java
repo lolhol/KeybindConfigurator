@@ -3,87 +3,114 @@ package org.brigero;
 import com.moandjiezana.toml.Toml;
 
 import java.io.File;
-import java.lang.reflect.Field;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class KeybindConfigurator {
 
-    public static <T, J> void runFunctions(File configPath, Class<T> configClass, J testingInstance) {
+    public static <J> void runFunctions(File configPath, J testingInstance) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         Toml toml = new Toml().read(configPath);
-        T config = toml.to(configClass);
+        Map<String, Object> config = toml.toMap();
 
         if (config == null) {
             System.err.println("Config is null! Stopping!");
             return;
         }
 
+        System.out.println(config);
+
         processFields(config, testingInstance);
     }
 
-    private static <J> void processFields(Object obj, J testingInstance) {
-        Class<?> clazz = obj.getClass();
-        Class<IEntree> myInterface = IEntree.class;
+    private static <J> void processFields(Map<String, Object> configMap, J testingInstance) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Class<?> clazz = testingInstance.getClass();
 
-        for (Field field : clazz.getDeclaredFields()) {
-            field.setAccessible(true);  // Allow access to private fields
+        for (Map.Entry<String, Object> entry : configMap.entrySet()) {
+            String methodName = entry.getKey();
+            Object fieldValue = entry.getValue();
 
-            try {
-                Object fieldValue = field.get(obj);
+            if (fieldValue instanceof Map) {
+                Map<String, Object> params = (Map<String, Object>) fieldValue;
+                Method method = findMatchingMethod(clazz, methodName, params);
 
-                if (fieldValue != null) {
-                    if (myInterface.isAssignableFrom(field.getType())) {
-                        // Field implements IEntree
-                        IEntree entreeInstance = (IEntree) fieldValue;
-                        String functionName = entreeInstance.getFunctionName();
-
-                        // Explicitly cast to Object[]
-                        Object[] additionalOptions = (Object[]) entreeInstance.getAdditionalOptions();
-
-                        // Dynamically determine parameter types for the method
-                        Class<?>[] paramTypes = new Class<?>[additionalOptions.length + 1];
-                        paramTypes[0] = String.class;  // First parameter is the field name
-                        for (int i = 0; i < additionalOptions.length; i++) {
-                            paramTypes[i + 1] = additionalOptions[i].getClass();
-                        }
-
-                        Method method = testingInstance.getClass().getMethod(functionName, paramTypes);
-                        Object[] args = new Object[additionalOptions.length + 1];
-                        args[0] = field.getName();  // Pass the field name as the first argument
-                        System.arraycopy(additionalOptions, 0, args, 1, additionalOptions.length);
-
-                        method.invoke(testingInstance, args);
-
-                    } else if (fieldValue instanceof String) {
-                        // Field is a String representing a function name
-                        String functionName = (String) fieldValue;
-
-                        Method method = testingInstance.getClass().getMethod(functionName, String.class);
-                        method.invoke(testingInstance, field.getName());
-
-                    } else if (fieldValue.getClass().isArray()) {
-                        // Handle arrays
-                        for (int i = 0; i < java.lang.reflect.Array.getLength(fieldValue); i++) {
-                            Object element = java.lang.reflect.Array.get(fieldValue, i);
-                            processFields(element, testingInstance);
-                        }
-
-                    } else if (fieldValue instanceof Iterable) {
-                        // Handle Iterable (e.g., List)
-                        for (Object element : (Iterable<?>) fieldValue) {
-                            processFields(element, testingInstance);
-                        }
-
-                    } else if (!field.getType().isPrimitive() && !field.getType().isEnum() && !field.getType().equals(String.class)) {
-                        // Recursively process fields of nested classes
-                        processFields(fieldValue, testingInstance);
-                    }
+                if (method != null) {
+                    Object[] castedParams = castParameters(method.getParameterTypes(), params);
+                    method.invoke(testingInstance, castedParams);
+                } else {
+                    System.err.println("No matching method found for: " + methodName);
                 }
-
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                System.err.println("Error processing field: " + field.getName() + " in class: " + clazz.getName());
-                e.printStackTrace();
             }
         }
     }
+
+    private static Method findMatchingMethod(Class<?> clazz, String methodName, Map<String, Object> params) {
+        for (Method method : clazz.getMethods()) {
+            if (method.getName().equals(methodName) && method.getParameterCount() == params.size()) {
+                Class<?>[] paramTypes = method.getParameterTypes();
+                if (isParameterMatch(paramTypes, params.values())) {
+                    return method;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isParameterMatch(Class<?>[] paramTypes, Iterable<Object> paramValues) {
+        int i = 0;
+        for (Object value : paramValues) {
+            if (!paramTypes[i].isAssignableFrom(value.getClass())) {
+                if (paramTypes[i].isArray() && List.class.isAssignableFrom(value.getClass())) {
+                    continue; // allow List to be converted to array
+                }
+                return false;
+            }
+            i++;
+        }
+        return true;
+    }
+
+    private static Object[] castParameters(Class<?>[] paramTypes, Map<String, Object> params) {
+        Object[] castedParams = new Object[paramTypes.length];
+        int i = 0;
+        for (Object value : params.values()) {
+            if (paramTypes[i].isArray() && value instanceof List) {
+                castedParams[i] = convertListToArray((List<?>) value, paramTypes[i].getComponentType());
+            } else {
+                castedParams[i] = paramTypes[i].cast(value);
+            }
+            i++;
+        }
+        return castedParams;
+    }
+
+    private static Object convertListToArray(List<?> list, Class<?> componentType) {
+        Object array = Array.newInstance(componentType, list.size());
+
+        for (int i = 0; i < list.size(); i++) {
+            Object value = list.get(i);
+
+            if (componentType == int.class) {
+                Array.set(array, i, ((Number) value).intValue());
+            } else if (componentType == double.class) {
+                Array.set(array, i, ((Number) value).doubleValue());
+            } else if (componentType == long.class) {
+                Array.set(array, i, ((Number) value).longValue());
+            } else if (componentType == float.class) {
+                Array.set(array, i, ((Number) value).floatValue());
+            } else if (componentType == short.class) {
+                Array.set(array, i, ((Number) value).shortValue());
+            } else if (componentType == byte.class) {
+                Array.set(array, i, ((Number) value).byteValue());
+            } else {
+                Array.set(array, i, componentType.cast(value));
+            }
+        }
+
+        return array;
+    }
+
 }

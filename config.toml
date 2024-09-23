@@ -1,4 +1,2 @@
-[X]
-functionName = "CustomXTest"
-numbers = [1, 2, 3]
-doubles = [1.0, 2.0, 3.0]
+[CustomXTest]
+name = "TestName"
