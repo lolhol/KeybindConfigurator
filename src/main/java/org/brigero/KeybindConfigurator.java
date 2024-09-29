@@ -6,13 +6,15 @@ import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class KeybindConfigurator {
 
-    public static <J> void runFunctions(File configPath, J testingInstance) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+    public static <J> void runFunctions(File configPath, J testingInstance)
+            throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         Toml toml = new Toml().read(configPath);
         Map<String, Object> config = toml.toMap();
 
@@ -21,12 +23,13 @@ public class KeybindConfigurator {
             return;
         }
 
-        System.out.println(config);
+        // System.out.println(config);
 
         processFields(config, testingInstance);
     }
 
-    private static <J> void processFields(Map<String, Object> configMap, J testingInstance) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    private static <J> void processFields(Map<String, Object> configMap, J testingInstance)
+            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Class<?> clazz = testingInstance.getClass();
 
         for (Map.Entry<String, Object> entry : configMap.entrySet()) {
@@ -50,8 +53,7 @@ public class KeybindConfigurator {
     private static Method findMatchingMethod(Class<?> clazz, String methodName, Map<String, Object> params) {
         for (Method method : clazz.getMethods()) {
             if (method.getName().equals(methodName) && method.getParameterCount() == params.size()) {
-                Class<?>[] paramTypes = method.getParameterTypes();
-                if (isParameterMatch(paramTypes, params.values())) {
+                if (isParameterMatch(method.getParameters(), params)) {
                     return method;
                 }
             }
@@ -59,13 +61,14 @@ public class KeybindConfigurator {
         return null;
     }
 
-    private static boolean isParameterMatch(Class<?>[] paramTypes, Iterable<Object> paramValues) {
+    private static boolean isParameterMatch(Parameter[] paramTypes, Map<String, Object> paramValues) {
         int i = 0;
-        for (Object value : paramValues) {
-            if (!paramTypes[i].isAssignableFrom(value.getClass())) {
-                if (paramTypes[i].isArray() && List.class.isAssignableFrom(value.getClass())) {
-                    continue; // allow List to be converted to array
+        for (var value : paramValues.entrySet()) {
+            if (!paramTypes[i].getType().isAssignableFrom(value.getValue().getClass())) {
+                if (paramTypes[i].getType().isArray() && List.class.isAssignableFrom(value.getClass())) {
+                    continue;
                 }
+
                 return false;
             }
             i++;
