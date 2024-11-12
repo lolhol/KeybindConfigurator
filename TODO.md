@@ -1,0 +1,1 @@
+- fix the lua value to java object converter (it's a hack fix because if converts to string first and then to int/etc, it works for now but will not work with harder structures (like list list lists idk))
